@@ -1,38 +1,4 @@
-Skip to content
-Search or jump to…
 
-Pull requests
-Issues
-Marketplace
-Explore
- 
-@suraj9876 
-rahullrajesh
-/
-implement-devops
-3
-45
-66
-Code
-Issues
-2
-Pull requests
-3
-Actions
-Projects
-Wiki
-Security
-Insights
-implement-devops/Set up and Configure a Cloud Environment in Google Cloud
-@rohinraj
-rohinraj Modified 14 Labs
-Latest commit dfdd64b 14 days ago
- History
- 2 contributors
-@rohinraj@rahullrajesh
-74 lines (38 sloc)  2.18 KB
-  
-#WATCH FULL VIDEO ON : https://www.youtube.com/watch?v=M4iWdIqZRm8
 
 gcloud compute networks create griffin-dev-vpc --subnet-mode custom
 
@@ -106,15 +72,17 @@ sed -i s/YOUR_SQL_INSTANCE/$I/g wp-deployment.yaml
 kubectl create -f wp-deployment.yaml
 
 kubectl create -f wp-service.yaml
-© 2020 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Help
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
+go to kubernetesd engine from navigation menu and in your formed wordpess file copy the end point
+now goto monitoring from navigation menu and select uptime checks
+then click on create uptime checks follows :
+name= wordpress-uptime-checks
+check type=http
+hostname= endpoint you copid previously withoput the :
+path=/
+now click on create and then click on create
+now go to iam &admins
+and then iam
+now search the username2 in the list
+click on pencil icon next to username2
+and in basic select editor and then save
+______________________congratulations_________________________________
