@@ -1,0 +1,303 @@
+
+Task: 1 Start a JupyterLab Notebook instance
+— — — — — — — — — — — — — — — — — — — — — — — — — — — -
+In the Cloud Console, in the search bar, type in Notebook.
+Select Notebook for the AI Platform.
+Image for post
+3. On the Notebook instances page, click New Instance.
+4. In the Customize instance menu, select the latest version of TensorFlow without GPUs. (Tensorflow 2.3 or any latest)
+5.In the New notebook instance dialog, accept the default options, and click Create.
+6. After a few minutes, the AI Platform console will display your instance name, followed by Open Jupyterlab.
+7. Click Open JupyterLab. Your notebook is now set up.
+Task 2: Download the Challenge Notebook
+— — — — — — — — — — — — — — — — — — — — — — — — — -
+In your notebook, click the terminal.
+Clone the repo:
+git clone https://github.com/GoogleCloudPlatform/training-data-analyst
+3. Go to the enclosing folder: training-data-analyst/quests/dei.
+4. Open the notebook file what-if-tool-challenge.ipynb.
+5. Download and import the dataset hmda_2017_ny_all-records_labels.
+All the code to download and pre-process the dataset has been provided for you. The rest of the steps will be inside the notebook file. You should refer back to this lab guide to check your progress and get some hints.
+Note: after cloning the repo you need to start executing each cell by clicking shift + enter
+TASK : 3 Build and train your models
+— — — — — — — — — — — — — — — — — — — — — — — —
+Use TensorFlow to build two models: one trained on the complete dataset, and one trained on the limited dataset. You should use the model Sequential(). Documentation is here.
+IMPORTANT: To accurately check your progress, the first model should be named complete_model and the second should be named limited_model.
+Task 4.Deploy the models to AI Platform
+— — — — — — — — — — — — — — — — — — — — — — — — — — —
+Now, you’ll deploy your models to the AI Platform.
+Hint: You need to first create a storage bucket to store your models in.
+Use the What-If Tool to explore biases
+After your models are deployed to the AI Platform, you can use the following code to explore them in the What-If Tool. We’ve created custom prediction functions custom_predict and bad_custom_predict that get the class predictions from the models.
+config_builder = (WitConfigBuilder(
+    examples_for_wit[:num_datapoints],feature_names=column_names)
+    .set_custom_predict_fn(bad_custom_predict)
+    .set_target_feature('loan_granted')
+    .set_label_vocab(['denied', 'accepted'])
+    .set_compare_custom_predict_fn(custom_predict)
+    .set_model_name('limited')
+    .set_compare_model_name('complete'))
+SOLUTION CODE :
+What-If Tool Challenge Lab
+In this notebook, you will use mortgage data from NY in 2017 to create two binary classifiers to determine if a mortgage applicant will be granted a loan.
+You will train classifiers on two datasets. One will be trained on the complete dataset, and the other will be trained on a subset of the dataset, where 90% of the female applicants that were granted a loan were removed from the training data (so the dataset has 90% fewer females that were granted loans).
+You will then compare and examine the two models using the What-If Tool.
+In this notebook, you will be expected to:
+Understand how the data is processed
+Write TensorFlow code to build and train two models
+Write code to deploy the models to AI Platform
+Examine the models in the What-If Tool
+Download and import the data
+import pandas as pd
+import numpy as np
+import collections
+from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.utils import shuffle
+from witwidget.notebook.visualization import WitWidget, WitConfigBuilder
+!wget https://files.consumerfinance.gov/hmda-historic-loan-data/hmda_2017_ny_all-records_labels.zip
+!unzip hmda_2017_ny_all-records_labels.zip
+Process the Data::
+# Set column dtypes for Pandas
+column_names = collections.OrderedDict({
+  'as_of_year': np.int16,
+  'agency_abbr': 'category',
+  'loan_type': 'category',
+  'property_type': 'category',
+  'loan_purpose': 'category',
+  'owner_occupancy': np.int8,
+  'loan_amt_000s': np.float64,
+  'preapproval': 'category',
+  'county_code': np.float64,
+  'applicant_income_00s': np.float64,
+  'purchaser_type': 'category',
+  'hoepa_status': 'category',
+  'lien_status': 'category',
+  'population': np.float64,
+  'ffiec_median_fam_income': np.float64,
+  'tract_to_msamd_income': np.float64,
+  'num_of_owner_occupied_units': np.float64,
+  'number_of_1_to_4_family_units': np.float64,
+  'approved': np.int8, 
+  'applicant_race_name_3': 'category',
+  'applicant_race_name_4': 'category',
+  'applicant_race_name_5': 'category',
+  'co_applicant_race_name_3': 'category',
+  'co_applicant_race_name_4': 'category',
+  'co_applicant_race_name_5': 'category'
+})
+
+# Import the CSV into a dataframe
+data = pd.read_csv('hmda_2017_ny_all-records_labels.csv', dtype=column_names)
+data = shuffle(data, random_state=2)
+Extract columns and create dummy data frames
+# Only use a subset of the columns for these models
+text_columns_to_keep = [
+             'agency_name',
+             'loan_type_name',
+             'property_type_name',
+             'loan_purpose_name',
+             'owner_occupancy_name',
+             'applicant_ethnicity_name',
+             'applicant_race_name_1',
+             'applicant_sex_name',                      
+]
+numeric_columns_to_keep = [
+             'loan_amount_000s',
+             'applicant_income_000s',
+             'population',
+             'minority_population',
+             'hud_median_family_income' 
+]
+
+columns_to_keep = text_columns_to_keep + numeric_columns_to_keep + ['action_taken_name']
+
+# Drop columns with incomplete information and drop columns that don't have loan orignated or denied, to make this a simple binary classification
+df = data[columns_to_keep].dropna()
+binary_df = df[df.action_taken_name.isin(['Loan originated', 'Application denied by financial institution'])].copy()
+binary_df.loc[:,'loan_granted'] = np.where(binary_df['action_taken_name'] == 'Loan originated', 1, 0)
+binary_df = binary_df.drop(columns=['action_taken_name'])
+
+# Drop 90% of loaned female applicants for a "bad training data" version
+loaned_females = (binary_df['applicant_sex_name'] == 'Female') & (binary_df['loan_granted'] == 1)
+bad_binary_df = binary_df.drop(binary_df[loaned_females].sample(frac=.9).index)
+# Now lets' see the distribution of approved / denied classes (0: denied, 1: approved)
+print(binary_df['loan_granted'].value_counts())
+# Turn categorical string features into simple 0/1 features (like turning "sex" into "sex_male" and "sex_female")
+dummies_df = pd.get_dummies(binary_df, columns=text_columns_to_keep)
+dummies_df = dummies_df.sample(frac=1).reset_index(drop=True)
+
+bad_dummies_df = pd.get_dummies(bad_binary_df, columns=text_columns_to_keep)
+bad_dummies_df = bad_dummies_df.sample(frac=1).reset_index(drop=True)
+# Normalize the numeric columns so that they all have the same scale to simplify modeling/training
+def normalize():
+  min_max_scaler = preprocessing.MinMaxScaler()
+  column_names_to_normalize = ['loan_amount_000s', 'applicant_income_000s', 'minority_population', 'hud_median_family_income', 'population']
+  x = dummies_df[column_names_to_normalize].values
+  x_scaled = min_max_scaler.fit_transform(x)
+  df_temp = pd.DataFrame(x_scaled, columns=column_names_to_normalize, index = dummies_df.index)
+  dummies_df[column_names_to_normalize] = df_temp
+
+  x = bad_dummies_df[column_names_to_normalize].values
+  x_scaled = min_max_scaler.fit_transform(x)
+  bad_df_temp = pd.DataFrame(x_scaled, columns=column_names_to_normalize, index = bad_dummies_df.index)
+  bad_dummies_df[column_names_to_normalize] = bad_df_temp
+
+normalize()
+Get Train & Test Data
+# Get the training data & labels
+test_data_with_labels = dummies_df
+
+train_data = dummies_df
+train_labels = train_data['loan_granted']
+train_data = train_data.drop(columns=['loan_granted'])
+
+# Get the bad (limited) training data and labels
+limited_train_data = bad_dummies_df
+limited_train_labels = limited_train_data['loan_granted']
+limited_train_data = bad_dummies_df.drop(columns=['loan_granted'])
+
+# Split the data into train / test sets for Model 1
+x,y = train_data,train_labels
+train_data,test_data,train_labels,test_labels = train_test_split(x,y)
+
+# Split the bad data into train / test sets for Model 2
+lim_x,lim_y=limited_train_data,limited_train_labels
+limited_train_data,limited_test_data,limited_train_labels,limited_test_labels = train_test_split(lim_x,lim_y)
+Train your first model on the complete dataset
+# import TF modules
+from tensorflow.keras import layers
+from tensorflow.keras import initializers
+from tensorflow.keras import optimizers
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+# This is the size of the array you'll be feeding into our model for each example
+input_size = len(train_data.iloc[0])
+
+# Train the first model on the complete dataset. Use `train_data` for your data and `train_labels` for you labels.
+
+# ---- TODO ---------
+model = Sequential()
+model.add(layers.Dense(200, input_shape=(input_size,), activation='relu'))
+model.add(layers.Dense(50, activation='relu'))
+model.add(layers.Dense(20, activation='relu'))
+model.add(layers.Dense(1, activation='sigmoid'))
+model.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
+model.fit(train_data, train_labels, epochs=10, batch_size=2048, validation_split=0.1)
+# Save your model
+!mkdir -p saved_model
+model.save('saved_model/my_model')
+# Get predictions on the test set and print the accuracy score (Model 1)
+y_pred = model.predict(test_data)
+acc = accuracy_score(test_labels, y_pred.round())
+print("Model 1 Accuracy: %.2f%%" % (acc * 100.0))
+Train your second model on the limited dataset
+# Train your second model on the limited dataset. Use `limited_train_data` for your data and `limited_train_labels` for your labels.
+# Use the same input_size for the limited_model
+
+# ---- TODO ---------
+# create the limited_model = Sequential()
+# limited_model.add (your layers)
+# limited_model.compile
+# limited_model.fit
+
+limited_model = Sequential()
+limited_model.add(layers.Dense(200, input_shape=(input_size,), activation='relu'))
+limited_model.add(layers.Dense(50, activation='relu'))
+limited_model.add(layers.Dense(20, activation='relu'))
+limited_model.add(layers.Dense(1, activation='sigmoid'))
+limited_model.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
+limited_model.fit(limited_train_data, limited_train_labels, epochs=10, batch_size=2048, validation_split=0.1)
+# Save your model
+!mkdir -p saved_limited_model
+limited_model.save('saved_limited_model/my_limited_model')
+# Get predictions on the test set and print the accuracy score (Model 2)
+limited_y_pred = limited_model.predict(limited_test_data)
+acc = accuracy_score(limited_test_labels, limited_y_pred.round())
+print("Model 2 Accuracy: %.2f%%" % (acc * 100.0))
+Deploy your models to the AI Platform
+# Fill out this information:
+
+GCP_PROJECT = '#declare your projectid'
+MODEL_BUCKET = 'gs://your bucket name'
+MODEL_NAME = 'complete_model' #do not modify
+LIM_MODEL_NAME = 'limited_model' #do not modify
+VERSION_NAME = 'v1'
+REGION = 'us-central1'
+# Copy your model files to Cloud Storage (these file paths are your 'origin' for the AI Platform Model)
+!gsutil cp -r ./saved_model $MODEL_BUCKET
+!gsutil cp -r ./saved_limited_model $MODEL_BUCKET
+# Configure gcloud to use your project
+!gcloud config set project $GCP_PROJECT
+Create your first AI Platform model: complete_model
+# 1. Create an AI Platform model resource for your COMPLETE model
+
+# ---- TODO ---------
+!gcloud ai-platform models create $MODEL_NAME --regions $REGION
+# 2. Now create a version. This will take a couple of minutes to deploy.
+
+# ---- TODO ------
+!gcloud ai-platform versions create $VERSION_NAME \
+--model=$MODEL_NAME \
+--framework='TENSORFLOW' \
+--runtime-version=2.1 \
+--origin=$MODEL_BUCKET/saved_model/my_model \
+--staging-bucket=$MODEL_BUCKET \
+--python-version=3.7
+Create your second AI Platform model: limited_model
+# 1. Create an AI Platform model resource for your LIMITED model
+
+# ---- TODO ---------
+!gcloud ai-platform models create $LIM_MODEL_NAME --regions $REGION
+# 2. Now create a version. This will take a couple of minutes to deploy.
+
+# ---- TODO ------
+!gcloud ai-platform versions create $VERSION_NAME \
+--model=$LIM_MODEL_NAME \
+--framework='TENSORFLOW' \
+--runtime-version=2.1 \
+--origin=$MODEL_BUCKET/saved_limited_model/my_limited_model \
+--staging-bucket=$MODEL_BUCKET \
+--python-version=3.7
+Using the What-if Tool to interpret your model
+#@title Show model results in WIT
+num_datapoints = 1000  #@param {type: "number"}
+
+# Column indices to strip out from data from WIT before passing it to the model.
+columns_not_for_model_input = [
+    test_data_with_labels.columns.get_loc('loan_granted'),
+]
+
+# Return model predictions.
+def custom_predict(examples_to_infer):
+  # Delete columns not used by model
+  model_inputs = np.delete(
+      np.array(examples_to_infer), columns_not_for_model_input, axis=1).tolist()
+  # Get the class predictions from the model.
+  preds = model.predict(model_inputs)
+  preds = [[1 - pred[0], pred[0]] for pred in preds]
+  return preds
+  
+# Return 'limited' model predictions.
+def limited_custom_predict(examples_to_infer):
+  # Delete columns not used by model
+  model_inputs = np.delete(
+      np.array(examples_to_infer), columns_not_for_model_input, axis=1).tolist()
+  # Get the class predictions from the model.
+  preds = limited_model.predict(model_inputs)
+  preds = [[1 - pred[0], pred[0]] for pred in preds]
+  return preds
+
+examples_for_wit = test_data_with_labels.values.tolist()
+column_names = test_data_with_labels.columns.tolist()
+
+config_builder = (WitConfigBuilder(
+    examples_for_wit[:num_datapoints],feature_names=column_names)
+    .set_custom_predict_fn(limited_custom_predict)
+    .set_target_feature('loan_granted')
+    .set_label_vocab(['denied', 'accepted'])
+    .set_compare_custom_predict_fn(custom_predict)
+    .set_model_name('limited')
+    .set_compare_model_name('complete'))
+WitWidget(config_builder, height=800)
