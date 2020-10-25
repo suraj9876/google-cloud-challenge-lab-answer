@@ -79,7 +79,7 @@ name= wordpress-uptime-checks
 check type=http
 hostname= endpoint you copid previously withoput the :
 path=/
-now click on create and then click on create
+now click on run and then click on create
 now go to iam &admins
 and then iam
 now search the username2 in the list
