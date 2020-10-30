@@ -1,0 +1,109 @@
+##login with your credentials.
+##go to vm instances then open the ssh windows of the karaken jumphost
+##and from now copy paste all the code in the ssh windows otherwise told except
+##copy and paste this first
+------------------------------
+cd /work/dm
+
+sed -i s/SET_REGION/us-east1/g prod-network.yaml
+
+gcloud deployment-manager deployments create prod-network --config=prod-network.yaml
+---------------------------------
+##now copy paste given file in same ssh 
+----------------------------
+
+gcloud config set compute/zone us-east1-b
+
+gcloud container clusters create kraken-prod \
+          --num-nodes 2 \
+          --network kraken-prod-vpc \
+          --subnetwork kraken-prod-subnet
+---------------------------------------------------------
+##wait for the cluster to be created
+##now copy the given command in ssh
+------------------------------------------
+gcloud container clusters get-credentials kraken-prod
+
+cd /work/k8s
+
+for F in $(ls *.yaml); do kubectl create -f $F; done
+##now copy the given command in ssh
+-------------------------------------------------
+gcloud config set compute/zone us-east1-b
+
+gcloud compute instances create kraken-admin --network-interface="subnet=kraken-mgmt-subnet" --network-interface="subnet=kraken-prod-subnet"
+-----------------------------------------------------------------------------------------------------------------------------------------
+from the NVM select monitoring and wait for the workspace to be created
+after that select alerting from the left panel then create policy
+click on add condition
+then in resource type = vm instances
+metric= cpu utilization
+filter select vm instance name select kraken admin from the menu = apply
+condition triggers if any select any time series violates
+condition =is above
+threshhold =50
+for = 1min
+now add
+click on next < manage notification channels<select email from the list<in email address put tyour gcp username in alert nme it user<save
+got to previous tab and click on refresh button on the side of manage notification channel<< then select the user named stuff
+click on next and now name the alert name= kraken-admin
+click on save
+_________________________________________________now check your progress_____________________
+now open the google cloud console
+copy paste this first
+-----------------------
+gcloud auth list
+gcloud config list project
+-------------
+copy paste in gc console
+--------------------------------------------
+gcloud config set compute/zone us-east1-b
+
+gcloud container clusters get-credentials spinnaker-tutorial
+
+DECK_POD=$(kubectl get pods --namespace default -l "cluster=spin-deck" -o jsonpath="{.items[0].metadata.name}")
+
+kubectl port-forward --namespace default $DECK_POD 8080:9000 >> /dev/null &
+---------------------------------------------------------------
+click on preview on port 8080
+in the newly opened spinnakker application
+now click on application from the task bar then select sample from the dialog box
+selec pipelines from task bar
+in the newly opened window
+where the deployment stops go to that and manually continue thaT
+COPY AND PASTE THE GIVEN CODE IN GCP CONSOLE
+---------------------------------------------------------------------------
+
+gcloud config set compute/zone us-east1-b
+
+gcloud source repos clone sample-app
+
+cd sample-app
+
+touch a
+
+git config --global user.email "$(gcloud config get-value account)"
+
+git config --global user.name "Student"
+
+git commit -a -m "change"
+
+git tag v1.0.1
+
+git push --tags
+-----------------------------------------------------------------------------------
+CLICK ON MANUAL START EXECUTION  FROM BELOW TASK BAR 
+SELECT DEPLOY
+CLICK RUN
+
+WHEN THE WHOLE BAR BECOMES BLUE THEN
+CHECK YOUR PROGRESS----------------------------------------------------------
+
+
+
+
+
+
+
+
+
